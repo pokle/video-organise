@@ -6,11 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Video Organise is a CLI tool that organizes files into folders based on their filesystem creation date.
 
+It looks for files with the following extensions:
+- `insv`
+- `insp`
+- `lrv`
+
+It ignores all other file types.
+
 ## Output Structure
 
 Files are organized into:
 ```
-/YYYY-MM-DD[-project-name]/raw/
+/YYYY-MM-DD[-project-name]/insta360/
 ```
 
 Where `YYYY-MM-DD` is extracted from the file's creation date and `project-name` is an optional suffix for manual editing after organization.

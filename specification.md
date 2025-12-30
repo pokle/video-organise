@@ -4,11 +4,12 @@
 A Python CLI tool that organizes ALL files from a source directory into date-based folders.
 
 ## Requirements
-- **File types**: ALL files (not just videos - supports Insta360 and other proprietary formats)
+- **File types**: Only insta360 files (`.insv`, `.insp`, `.lrv`) are organized; all other files are ignored.
+- **Recursion**: Scan source directory recursively for files.
 - **Date source**: File creation/modification date from filesystem (no metadata parsing)
 - **File action**: Copy files, skip if already exists AND same size
 - **Default mode**: Dry-run (preview only)
-- **Output structure**: `{dest}/YYYY-MM-DD/raw/{original-filename}`
+- **Output structure**: `{dest}/YYYY-MM-DD/insta360/{original-filename}`
 
 ## CLI Interface
 
@@ -36,7 +37,7 @@ Returns True if destination doesn't exist OR exists but has different size.
 1. Scan source directory for ALL files (recursive)
 2. For each file:
    - Get file creation date from filesystem
-   - Determine destination: `{dest}/{YYYY-MM-DD}/raw/{original-filename}`
+   - Determine destination: `{dest}/{YYYY-MM-DD}/insta360/{original-filename}`
    - Check if file exists at destination with same size -> skip
    - If dry-run: print what would be copied
    - If --approve: create directories and copy file

@@ -7,12 +7,12 @@ A simple tool to organise your files into folders based on their creation date.
 The tool organises files into a directory structure based on the following hierarchy:
 
 ```
-/YYYY-MM-DD[-project-name]/raw/
+/YYYY-MM-DD[-project-name]/insta360/
 ```
 
 - `YYYY-MM-DD`: The date the file was created.
 - `project-name`: An optional project name that can be included in the folder name. Manually edit this part after the date if desired.
-- `raw`: A subfolder where the original files are stored.
+- `insta360`: A subfolder where the original files are stored.
 
 ## Features
 - Automatically creates folders based on file creation date.

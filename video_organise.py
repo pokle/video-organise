@@ -1,8 +1,11 @@
 """
-Video Organise - Organize files into date-based folders.
+Video Organise - Organize Insta360 files into date-based folders.
 
-Copies all files from a source directory into destination folders
-organized by file creation date: {dest}/YYYY-MM-DD/raw/{filename}
+Copies Insta360 files (.insv, .insp, .lrv) from a source directory into
+destination folders organized by file creation date:
+{dest}/YYYY-MM-DD/insta360/{filename}
+
+All other file types are ignored.
 """
 
 import shutil
@@ -11,7 +14,15 @@ from pathlib import Path
 
 import typer
 
-app = typer.Typer(help="Organize files into date-based folders.")
+app = typer.Typer(help="Organize Insta360 files into date-based folders.")
+
+# Insta360 file extensions
+INSTA360_EXTENSIONS = {".insv", ".insp", ".lrv"}
+
+
+def is_insta360_file(file_path: Path) -> bool:
+    """Check if file is an Insta360 file based on extension."""
+    return file_path.suffix.lower() in INSTA360_EXTENSIONS
 
 
 def get_file_date(file_path: Path) -> date:
@@ -53,7 +64,7 @@ def main(
         dir_okay=True,
         readable=True,
         resolve_path=True,
-        help="Source directory containing files to organize.",
+        help="Source directory containing Insta360 files to organize.",
     ),
     destination_directory: Path = typer.Argument(
         ...,
@@ -70,18 +81,20 @@ def main(
         help="Actually copy files. Without this flag, only shows what would be done.",
     ),
 ) -> None:
-    """Organize files from source into date-based folders in destination.
+    """Organize Insta360 files from source into date-based folders in destination.
 
-    Files are copied to: {destination}/YYYY-MM-DD/raw/{original-filename}
+    Only Insta360 files (.insv, .insp, .lrv) are processed. All other files are ignored.
+
+    Files are copied to: {destination}/YYYY-MM-DD/insta360/{original-filename}
 
     By default, runs in dry-run mode showing what would be copied.
     Use --approve to actually copy files.
     """
-    # Collect all files recursively
-    files = [f for f in source_directory.rglob("*") if f.is_file()]
+    # Collect all Insta360 files recursively
+    files = [f for f in source_directory.rglob("*") if f.is_file() and is_insta360_file(f)]
 
     if not files:
-        typer.echo("No files found in source directory.")
+        typer.echo("No Insta360 files found in source directory.")
         raise typer.Exit()
 
     to_copy: list[tuple[Path, Path]] = []
@@ -91,7 +104,7 @@ def main(
     for src_file in files:
         file_date = get_file_date(src_file)
         date_folder = file_date.strftime("%Y-%m-%d")
-        dest_path = destination_directory / date_folder / "raw" / src_file.name
+        dest_path = destination_directory / date_folder / "insta360" / src_file.name
 
         if should_copy(src_file, dest_path):
             to_copy.append((src_file, dest_path))
@@ -115,9 +128,9 @@ def main(
         if approve:
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src_file, dest_path)
-            typer.echo(f"Copied: {src_file.name} -> {dest_path.parent.parent.name}/raw/")
+            typer.echo(f"Copied: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
         else:
-            typer.echo(f"Would copy: {src_file.name} -> {dest_path.parent.parent.name}/raw/")
+            typer.echo(f"Would copy: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
 
     if not approve and to_copy:
         typer.echo("")
