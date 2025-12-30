@@ -1,8 +1,8 @@
 """
 Video Organise - Organize Insta360 files into date-based folders.
 
-Copies Insta360 files (.insv, .insp, .lrv) from a source directory into
-destination folders organized by file creation date:
+Copies Insta360 files (.insv, .insp, .lrv, fileinfo_list.list) from a source
+directory into destination folders organized by file creation date:
 {dest}/YYYY-MM-DD/insta360/{filename}
 
 All other file types are ignored.
@@ -19,10 +19,13 @@ app = typer.Typer(help="Organize Insta360 files into date-based folders.")
 # Insta360 file extensions
 INSTA360_EXTENSIONS = {".insv", ".insp", ".lrv"}
 
+# Insta360 specific filenames
+INSTA360_FILENAMES = {"fileinfo_list.list"}
+
 
 def is_insta360_file(file_path: Path) -> bool:
-    """Check if file is an Insta360 file based on extension."""
-    return file_path.suffix.lower() in INSTA360_EXTENSIONS
+    """Check if file is an Insta360 file based on extension or filename."""
+    return file_path.suffix.lower() in INSTA360_EXTENSIONS or file_path.name in INSTA360_FILENAMES
 
 
 def get_file_date(file_path: Path) -> date:
@@ -83,7 +86,8 @@ def main(
 ) -> None:
     """Organize Insta360 files from source into date-based folders in destination.
 
-    Only Insta360 files (.insv, .insp, .lrv) are processed. All other files are ignored.
+    Only Insta360 files (.insv, .insp, .lrv, fileinfo_list.list) are processed.
+    All other files are ignored.
 
     Files are copied to: {destination}/YYYY-MM-DD/insta360/{original-filename}
 

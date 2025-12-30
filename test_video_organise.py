@@ -105,6 +105,12 @@ class TestIsInsta360File:
     def test_mov_is_not_insta360(self, tmp_path: Path) -> None:
         assert is_insta360_file(tmp_path / "video.mov") is False
 
+    def test_fileinfo_list_is_insta360(self, tmp_path: Path) -> None:
+        assert is_insta360_file(tmp_path / "fileinfo_list.list") is True
+
+    def test_other_list_file_is_not_insta360(self, tmp_path: Path) -> None:
+        assert is_insta360_file(tmp_path / "other.list") is False
+
 
 class TestCLI:
     """Tests for CLI interface."""

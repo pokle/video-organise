@@ -1,10 +1,10 @@
 # Video Organise CLI Specification
 
 ## Overview
-A Python CLI tool that organizes ALL files from a source directory into date-based folders.
+A Python CLI tool that organizes Insta360 files from a source directory into date-based folders.
 
 ## Requirements
-- **File types**: Only insta360 files (`.insv`, `.insp`, `.lrv`) are organized; all other files are ignored.
+- **File types**: Only Insta360 files (`*.insv`, `*.insp`, `*.lrv`, `fileinfo_list.list`) are organized; all other files are ignored.
 - **Recursion**: Scan source directory recursively for files.
 - **Date source**: File creation/modification date from filesystem (no metadata parsing)
 - **File action**: Copy files, skip if already exists AND same size
@@ -54,4 +54,44 @@ video-organise --approve /Volumes/SDCARD /archive/videos
 
 # Or run via uv
 uv run video-organise /Volumes/SDCARD /archive/videos
+```
+
+---
+
+## Fix Structure Script
+
+A separate script to fix existing archives where Insta360 files are not in the correct `insta360/` subfolder.
+
+### CLI Interface
+
+```
+fix-structure <source-directory>
+```
+
+### Output
+Generates a shell script (to stdout) with `mkdir` and `mv` commands to move non-compliant files.
+
+Output includes:
+- `#!/usr/bin/env bash` shebang
+- `set -x` for verbose execution
+- `mkdir -p` commands for creating `insta360/` subfolders
+- `mv` commands for moving files
+
+### Warnings
+- Warns (to stderr) about non-compliant folders in root that don't match the date pattern `YYYY-MM-DD` or `YYYY-MM-DD[-/ ]project-name`
+
+### Date Folder Pattern
+Matches folders named:
+- `YYYY-MM-DD` (e.g., `2024-01-15`)
+- `YYYY-MM-DD-suffix` (e.g., `2024-01-15-vacation`)
+- `YYYY-MM-DD suffix` (e.g., `2024-01-15 Trip to Paris`)
+
+### Usage
+
+```bash
+# Preview commands (outputs to stdout)
+uv run python fix_structure.py /archive/videos
+
+# Execute the generated commands
+uv run python fix_structure.py /archive/videos | bash
 ```

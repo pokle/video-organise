@@ -1,8 +1,8 @@
 """
 Fix Structure - Generate shell commands to fix non-compliant Insta360 file organization.
 
-Finds Insta360 files (.insv, .insp, .lrv) that are not in the insta360/ subfolder
-within date folders and outputs shell commands to move them.
+Finds Insta360 files (.insv, .insp, .lrv, fileinfo_list.list) that are not in the
+insta360/ subfolder within date folders and outputs shell commands to move them.
 
 Non-Insta360 files are ignored.
 """
@@ -20,10 +20,13 @@ DATE_FOLDER_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}([ -].*)?$")
 # Insta360 file extensions
 INSTA360_EXTENSIONS = {".insv", ".insp", ".lrv"}
 
+# Insta360 specific filenames
+INSTA360_FILENAMES = {"fileinfo_list.list"}
+
 
 def is_insta360_file(file_path: Path) -> bool:
-    """Check if file is an Insta360 file based on extension."""
-    return file_path.suffix.lower() in INSTA360_EXTENSIONS
+    """Check if file is an Insta360 file based on extension or filename."""
+    return file_path.suffix.lower() in INSTA360_EXTENSIONS or file_path.name in INSTA360_FILENAMES
 
 
 def is_date_folder(folder: Path) -> bool:
@@ -71,8 +74,20 @@ def main(
     Scans date folders (YYYY-MM-DD or YYYY-MM-DD-project-name) and outputs
     mkdir and mv commands to move Insta360 files into the insta360/ subfolder.
 
-    Only Insta360 files (.insv, .insp, .lrv) are processed. All other files are ignored.
+    Only Insta360 files (.insv, .insp, .lrv, fileinfo_list.list) are processed.
+    All other files are ignored.
     """
+    # Check for non-compliant folders in root (folders that don't match date pattern)
+    non_compliant_folders = [
+        d for d in source_directory.iterdir()
+        if d.is_dir() and not is_date_folder(d)
+    ]
+    if non_compliant_folders:
+        typer.echo("# Warning: Non-compliant folders found in root:", err=True)
+        for folder in sorted(non_compliant_folders):
+            typer.echo(f"#   {folder.name}", err=True)
+        typer.echo("", err=True)
+
     # Find all Insta360 files in date folders
     files = [f for f in source_directory.rglob("*") if f.is_file() and is_insta360_file(f)]
 
@@ -105,6 +120,11 @@ def main(
     if not moves:
         typer.echo("# All Insta360 files are already compliant.", err=True)
         raise typer.Exit()
+
+    # Output shell script header
+    typer.echo("#!/usr/bin/env bash")
+    typer.echo("set -x")
+    typer.echo("")
 
     # Output mkdir commands
     for dir_path in sorted(dirs_to_create):

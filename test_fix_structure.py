@@ -42,6 +42,12 @@ class TestIsInsta360File:
     def test_json_is_not_insta360(self, tmp_path: Path) -> None:
         assert is_insta360_file(tmp_path / "metadata.json") is False
 
+    def test_fileinfo_list_is_insta360(self, tmp_path: Path) -> None:
+        assert is_insta360_file(tmp_path / "fileinfo_list.list") is True
+
+    def test_other_list_file_is_not_insta360(self, tmp_path: Path) -> None:
+        assert is_insta360_file(tmp_path / "other.list") is False
+
 
 class TestIsDateFolder:
     """Tests for is_date_folder function."""
@@ -164,6 +170,8 @@ class TestCLI:
         result = runner.invoke(app, [str(tmp_path)])
 
         assert result.exit_code == 0
+        assert "#!/usr/bin/env bash" in result.output
+        assert "set -x" in result.output
         assert "mkdir -p" in result.output
         assert "/insta360" in result.output
         assert "mv" in result.output
@@ -232,6 +240,24 @@ class TestCLI:
         assert result.exit_code == 0
         # Should not generate any mv commands for files outside date folders
         assert "mv" not in result.output
+
+    def test_warns_about_non_compliant_folders(self, tmp_path: Path) -> None:
+        """Should warn about folders that don't match date pattern."""
+        # Create a compliant date folder with files to move
+        date_folder = tmp_path / "2024-01-15"
+        date_folder.mkdir()
+        (date_folder / "video.insv").write_text("content")
+
+        # Create non-compliant folders
+        (tmp_path / "random-folder").mkdir()
+        (tmp_path / "Camera01").mkdir()
+
+        result = runner.invoke(app, [str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Warning: Non-compliant folders found in root" in result.output
+        assert "random-folder" in result.output
+        assert "Camera01" in result.output
 
     def test_date_folder_with_space_suffix(self, tmp_path: Path) -> None:
         """Test folder names like '2023-03-03 Moggs in the dark'."""
