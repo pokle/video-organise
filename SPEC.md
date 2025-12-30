@@ -7,14 +7,14 @@ A Python CLI tool that organizes Insta360 files from a source directory into dat
 - **File types**: Only Insta360 files (`*.insv`, `*.insp`, `*.lrv`, `fileinfo_list.list`) are organized; all other files are ignored.
 - **Recursion**: Scan source directory recursively for files.
 - **Date source**: File creation/modification date from filesystem (no metadata parsing)
-- **File action**: Copy files, skip if already exists AND same size
+- **File action**: Copy files (or move with `--move`), skip if already exists AND same size
 - **Default mode**: Dry-run (preview only)
 - **Output structure**: `{dest}/YYYY-MM-DD/insta360/{original-filename}`
 
 ## CLI Interface
 
 ```
-video-organise <source-directory> <destination-directory> [--approve]
+video-organise <source-directory> <destination-directory> [--approve] [--move]
 ```
 
 ### Arguments
@@ -22,7 +22,8 @@ video-organise <source-directory> <destination-directory> [--approve]
 - `destination_directory`: Path (must exist, must be directory)
 
 ### Options
-- `--approve`: Actually perform the copy (default is dry-run/preview mode)
+- `--approve`: Actually perform the copy/move (default is dry-run/preview mode)
+- `--move`: Move files instead of copying them
 
 ## Core Functions
 
@@ -51,6 +52,9 @@ video-organise /Volumes/SDCARD /archive/videos
 
 # Actually copy files
 video-organise --approve /Volumes/SDCARD /archive/videos
+
+# Move files instead of copying
+video-organise --approve --move /Volumes/SDCARD /archive/videos
 
 # Or run via uv
 uv run video-organise /Volumes/SDCARD /archive/videos

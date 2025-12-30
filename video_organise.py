@@ -81,7 +81,12 @@ def main(
     approve: bool = typer.Option(
         False,
         "--approve",
-        help="Actually copy files. Without this flag, only shows what would be done.",
+        help="Actually copy/move files. Without this flag, only shows what would be done.",
+    ),
+    move: bool = typer.Option(
+        False,
+        "--move",
+        help="Move files instead of copying them.",
     ),
 ) -> None:
     """Organize Insta360 files from source into date-based folders in destination.
@@ -117,10 +122,11 @@ def main(
             skipped.append(src_file)
 
     # Print summary
+    action = "Moving" if move else "Copying"
     if approve:
-        typer.echo(f"Copying {len(to_copy)} files ({format_size(total_size)})")
+        typer.echo(f"{action} {len(to_copy)} files ({format_size(total_size)})")
     else:
-        typer.echo(f"[DRY RUN] Would copy {len(to_copy)} files ({format_size(total_size)})")
+        typer.echo(f"[DRY RUN] Would {'move' if move else 'copy'} {len(to_copy)} files ({format_size(total_size)})")
 
     if skipped:
         typer.echo(f"Skipping {len(skipped)} files (already exist with same size)")
@@ -131,14 +137,18 @@ def main(
     for src_file, dest_path in to_copy:
         if approve:
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(src_file, dest_path)
-            typer.echo(f"Copied: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
+            if move:
+                shutil.move(src_file, dest_path)
+                typer.echo(f"Moved: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
+            else:
+                shutil.copy2(src_file, dest_path)
+                typer.echo(f"Copied: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
         else:
-            typer.echo(f"Would copy: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
+            typer.echo(f"Would {'move' if move else 'copy'}: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
 
     if not approve and to_copy:
         typer.echo("")
-        typer.echo("Run with --approve to copy files.")
+        typer.echo(f"Run with --approve to {'move' if move else 'copy'} files.")
 
 
 if __name__ == "__main__":

@@ -148,10 +148,51 @@ class TestCLI:
         assert result.exit_code == 0
         assert "Copied:" in result.output
 
-        # File should be copied
+        # File should be copied (source still exists)
         expected_dest = dest_dir / date.today().strftime("%Y-%m-%d") / "insta360" / "video.insv"
         assert expected_dest.exists()
         assert expected_dest.read_text() == "video content"
+        assert test_file.exists()  # Source file still exists after copy
+
+    def test_move_flag_moves_files(self, tmp_path: Path) -> None:
+        """With --approve --move, files should be moved."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        test_file = src_dir / "video.insv"
+        test_file.write_text("video content")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir), "--approve", "--move"])
+
+        assert result.exit_code == 0
+        assert "Moved:" in result.output
+
+        # File should be moved (source no longer exists)
+        expected_dest = dest_dir / date.today().strftime("%Y-%m-%d") / "insta360" / "video.insv"
+        assert expected_dest.exists()
+        assert expected_dest.read_text() == "video content"
+        assert not test_file.exists()  # Source file removed after move
+
+    def test_move_dry_run(self, tmp_path: Path) -> None:
+        """Dry run with --move should show 'Would move'."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        test_file = src_dir / "video.insv"
+        test_file.write_text("video content")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir), "--move"])
+
+        assert result.exit_code == 0
+        assert "[DRY RUN]" in result.output
+        assert "Would move" in result.output
+        assert "Run with --approve to move files" in result.output
+        # File should NOT be moved in dry run
+        assert test_file.exists()
 
     def test_skips_existing_same_size(self, tmp_path: Path) -> None:
         """Should skip files that already exist with same size."""
