@@ -1,0 +1,26 @@
+[project]
+name = "video-organise"
+version = "0.1.0"
+description = "CLI tool to organize files into date-based folders"
+requires-python = ">=3.12"
+dependencies = [
+    "typer>=0.21.0",
+]
+
+[project.scripts]
+video-organise = "video_organise:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["video_organise"]
+
+[tool.uv]
+package = true
