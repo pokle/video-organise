@@ -6,9 +6,43 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from video_organise import app, get_file_date, should_copy, format_size, is_insta360_file
+from video_organise import app, get_file_date, get_date_from_filename, should_copy, format_size, is_insta360_file
 
 runner = CliRunner()
+
+
+class TestGetDateFromFilename:
+    """Tests for get_date_from_filename function."""
+
+    def test_vid_filename(self, tmp_path: Path) -> None:
+        """Should extract date from VID_ prefixed filename."""
+        test_file = tmp_path / "VID_20241011_185020_00_003.insv"
+        result = get_date_from_filename(test_file)
+        assert result == date(2024, 10, 11)
+
+    def test_lrv_filename(self, tmp_path: Path) -> None:
+        """Should extract date from LRV_ prefixed filename."""
+        test_file = tmp_path / "LRV_20240926_150746_01_003.lrv"
+        result = get_date_from_filename(test_file)
+        assert result == date(2024, 9, 26)
+
+    def test_img_filename(self, tmp_path: Path) -> None:
+        """Should extract date from IMG_ prefixed filename."""
+        test_file = tmp_path / "IMG_20240915_133402_00_027.insp"
+        result = get_date_from_filename(test_file)
+        assert result == date(2024, 9, 15)
+
+    def test_no_date_in_filename(self, tmp_path: Path) -> None:
+        """Should return None for files without date pattern."""
+        test_file = tmp_path / "random_file.insv"
+        result = get_date_from_filename(test_file)
+        assert result is None
+
+    def test_fileinfo_list(self, tmp_path: Path) -> None:
+        """Should return None for fileinfo_list.list."""
+        test_file = tmp_path / "fileinfo_list.list"
+        result = get_date_from_filename(test_file)
+        assert result is None
 
 
 class TestGetFileDate:
@@ -23,14 +57,24 @@ class TestGetFileDate:
 
         assert isinstance(result, date)
 
-    def test_returns_reasonable_date(self, tmp_path: Path) -> None:
-        """Should return today's date for newly created file."""
+    def test_returns_filesystem_date_for_generic_filename(self, tmp_path: Path) -> None:
+        """Should return today's date for file without date in filename."""
         test_file = tmp_path / "test.insv"
         test_file.write_text("content")
 
         result = get_file_date(test_file)
 
         assert result == date.today()
+
+    def test_prefers_filename_date_over_filesystem(self, tmp_path: Path) -> None:
+        """Should use date from filename even if filesystem date differs."""
+        test_file = tmp_path / "VID_20230505_120000_00_001.insv"
+        test_file.write_text("content")
+
+        result = get_file_date(test_file)
+
+        # Should use filename date, not today's filesystem date
+        assert result == date(2023, 5, 5)
 
 
 class TestShouldCopy:
@@ -194,6 +238,25 @@ class TestCLI:
         # File should NOT be moved in dry run
         assert test_file.exists()
 
+    def test_dry_run_shows_full_paths(self, tmp_path: Path) -> None:
+        """Dry run should show full source and destination paths."""
+        src_dir = tmp_path / "src"
+        nested = src_dir / "Camera01"
+        nested.mkdir(parents=True)
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        test_file = nested / "video.insv"
+        test_file.write_text("video content")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 0
+        # Should show full source path
+        assert str(test_file) in result.output
+        # Should show full destination path
+        assert str(dest_dir) in result.output
+
     def test_skips_existing_same_size(self, tmp_path: Path) -> None:
         """Should skip files that already exist with same size."""
         src_dir = tmp_path / "src"
@@ -257,7 +320,7 @@ class TestCLI:
         assert (date_folder / "insta360").exists()
 
     def test_preserves_filename(self, tmp_path: Path) -> None:
-        """Should preserve original filename."""
+        """Should preserve original filename and use date from filename."""
         src_dir = tmp_path / "src"
         src_dir.mkdir()
         dest_dir = tmp_path / "dest"
@@ -269,7 +332,8 @@ class TestCLI:
         result = runner.invoke(app, [str(src_dir), str(dest_dir), "--approve"])
 
         assert result.exit_code == 0
-        expected_dest = dest_dir / date.today().strftime("%Y-%m-%d") / "insta360" / "VID_20230303_193624_00_001.insv"
+        # Date extracted from filename (2023-03-03), not filesystem
+        expected_dest = dest_dir / "2023-03-03" / "insta360" / "VID_20230303_193624_00_001.insv"
         assert expected_dest.exists()
 
     def test_handles_multiple_insta360_files(self, tmp_path: Path) -> None:

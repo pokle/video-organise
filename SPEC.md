@@ -6,7 +6,7 @@ A Python CLI tool that organizes Insta360 files from a source directory into dat
 ## Requirements
 - **File types**: Only Insta360 files (`*.insv`, `*.insp`, `*.lrv`, `fileinfo_list.list`) are organized; all other files are ignored.
 - **Recursion**: Scan source directory recursively for files.
-- **Date source**: File creation/modification date from filesystem (no metadata parsing)
+- **Date source**: Extract from filename pattern (e.g., `VID_20241011_...`), fall back to filesystem creation date
 - **File action**: Copy files (or move with `--move`), skip if already exists AND same size
 - **Default mode**: Dry-run (preview only)
 - **Output structure**: `{dest}/YYYY-MM-DD/insta360/{original-filename}`
@@ -27,8 +27,16 @@ video-organise <source-directory> <destination-directory> [--approve] [--move]
 
 ## Core Functions
 
+### `get_date_from_filename(file_path: Path) -> date | None`
+Extract date from Insta360 filename patterns:
+- `VID_YYYYMMDD_HHMMSS_...` (video)
+- `LRV_YYYYMMDD_HHMMSS_...` (low-res video)
+- `IMG_YYYYMMDD_HHMMSS_...` (image)
+
+Returns `None` if filename doesn't match pattern.
+
 ### `get_file_date(file_path: Path) -> date`
-Get creation date from filesystem using `st_birthtime` on macOS, fall back to `st_mtime`.
+Get date for file, preferring filename over filesystem. Falls back to `st_birthtime` on macOS or `st_mtime`.
 
 ### `should_copy(src: Path, dest: Path) -> bool`
 Returns True if destination doesn't exist OR exists but has different size.
@@ -37,7 +45,7 @@ Returns True if destination doesn't exist OR exists but has different size.
 
 1. Scan source directory for ALL files (recursive)
 2. For each file:
-   - Get file creation date from filesystem
+   - Extract date from filename pattern, or fall back to filesystem date
    - Determine destination: `{dest}/{YYYY-MM-DD}/insta360/{original-filename}`
    - Check if file exists at destination with same size -> skip
    - If dry-run: print what would be copied

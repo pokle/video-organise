@@ -2,12 +2,13 @@
 Video Organise - Organize Insta360 files into date-based folders.
 
 Copies Insta360 files (.insv, .insp, .lrv, fileinfo_list.list) from a source
-directory into destination folders organized by file creation date:
+directory into destination folders organized by date extracted from filename:
 {dest}/YYYY-MM-DD/insta360/{filename}
 
 All other file types are ignored.
 """
 
+import re
 import shutil
 from datetime import date
 from pathlib import Path
@@ -28,7 +29,29 @@ def is_insta360_file(file_path: Path) -> bool:
     return file_path.suffix.lower() in INSTA360_EXTENSIONS or file_path.name in INSTA360_FILENAMES
 
 
-def get_file_date(file_path: Path) -> date:
+# Pattern to extract date from Insta360 filenames like:
+# VID_20241011_185020_00_003.insv
+# LRV_20240926_150746_01_003.lrv
+# IMG_20240915_133402_00_027.insp
+FILENAME_DATE_PATTERN = re.compile(r"^(?:VID|LRV|IMG)_(\d{4})(\d{2})(\d{2})_")
+
+
+def get_date_from_filename(file_path: Path) -> date | None:
+    """Extract date from Insta360 filename pattern.
+
+    Returns None if filename doesn't match expected pattern.
+    """
+    match = FILENAME_DATE_PATTERN.match(file_path.name)
+    if match:
+        year, month, day = int(match.group(1)), int(match.group(2)), int(match.group(3))
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
+    return None
+
+
+def get_file_date_from_filesystem(file_path: Path) -> date:
     """Get creation date from filesystem.
 
     Uses st_birthtime on macOS, falls back to st_mtime.
@@ -37,6 +60,18 @@ def get_file_date(file_path: Path) -> date:
     # st_birthtime is available on macOS
     timestamp = getattr(stat, "st_birthtime", None) or stat.st_mtime
     return date.fromtimestamp(timestamp)
+
+
+def get_file_date(file_path: Path) -> date:
+    """Get date for file, preferring filename over filesystem.
+
+    First tries to extract date from filename pattern (e.g., VID_20241011_...).
+    Falls back to filesystem creation date if no date in filename.
+    """
+    filename_date = get_date_from_filename(file_path)
+    if filename_date:
+        return filename_date
+    return get_file_date_from_filesystem(file_path)
 
 
 def should_copy(src: Path, dest: Path) -> bool:
@@ -139,12 +174,12 @@ def main(
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             if move:
                 shutil.move(src_file, dest_path)
-                typer.echo(f"Moved: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
+                typer.echo(f"Moved: {src_file} -> {dest_path}")
             else:
                 shutil.copy2(src_file, dest_path)
-                typer.echo(f"Copied: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
+                typer.echo(f"Copied: {src_file} -> {dest_path}")
         else:
-            typer.echo(f"Would {'move' if move else 'copy'}: {src_file.name} -> {dest_path.parent.parent.name}/insta360/")
+            typer.echo(f"Would {'move' if move else 'copy'}: {src_file} -> {dest_path}")
 
     if not approve and to_copy:
         typer.echo("")
