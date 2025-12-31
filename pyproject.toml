@@ -1,6 +1,6 @@
 [project]
 name = "video-organise"
-version = "0.1.0"
+version = "1.0.0"
 description = "CLI tool to organize files into date-based folders"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,8 +9,7 @@ dependencies = [
 authors = [
   { name="Tushar Pokle", email="tushar.pokle@gmail.com" },
 ]
-readme="README.md
-licence = "MIT"
+readme="README.md"
 [project.urls]
 Homepage = "https://github.com/pokle/video-organise"
 
