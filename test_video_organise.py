@@ -106,6 +106,25 @@ class TestShouldCopy:
 
         assert should_copy(src, dest) is True
 
+    def test_returns_false_when_same_file(self, tmp_path: Path) -> None:
+        """Should return False when source and destination are the same file."""
+        src = tmp_path / "video.insv"
+        src.write_text("content")
+
+        # Same path should not be copied
+        assert should_copy(src, src) is False
+
+    def test_returns_false_when_same_file_via_symlink(self, tmp_path: Path) -> None:
+        """Should return False when paths resolve to the same file."""
+        src = tmp_path / "video.insv"
+        src.write_text("content")
+        link = tmp_path / "link.insv"
+        link.symlink_to(src)
+
+        # Link resolves to same file, should not be copied
+        assert should_copy(src, link) is False
+
+
 
 class TestFormatSize:
     """Tests for format_size function."""

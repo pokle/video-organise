@@ -77,8 +77,12 @@ def get_file_date(file_path: Path) -> date:
 def should_copy(src: Path, dest: Path) -> bool:
     """Check if file should be copied.
 
+    Returns False if source and destination are the same file.
     Returns True if destination doesn't exist or has different size.
     """
+    # Skip if source and destination are the same file
+    if src.resolve() == dest.resolve():
+        return False
     if not dest.exists():
         return True
     return src.stat().st_size != dest.stat().st_size
@@ -142,7 +146,8 @@ def main(
         raise typer.Exit()
 
     to_copy: list[tuple[Path, Path]] = []
-    skipped: list[Path] = []
+    skipped_same_file: list[Path] = []
+    skipped_exists: list[Path] = []
     total_size = 0
 
     for src_file in files:
@@ -150,11 +155,17 @@ def main(
         date_folder = file_date.strftime("%Y-%m-%d")
         dest_path = destination_directory / date_folder / "insta360" / src_file.name
 
-        if should_copy(src_file, dest_path):
+        # Check if source and destination are the same file
+        if src_file.resolve() == dest_path.resolve():
+            skipped_same_file.append(src_file)
+        elif not dest_path.exists():
+            to_copy.append((src_file, dest_path))
+            total_size += src_file.stat().st_size
+        elif src_file.stat().st_size != dest_path.stat().st_size:
             to_copy.append((src_file, dest_path))
             total_size += src_file.stat().st_size
         else:
-            skipped.append(src_file)
+            skipped_exists.append(src_file)
 
     # Print summary
     action = "Moving" if move else "Copying"
@@ -163,8 +174,10 @@ def main(
     else:
         typer.echo(f"[DRY RUN] Would {'move' if move else 'copy'} {len(to_copy)} files ({format_size(total_size)})")
 
-    if skipped:
-        typer.echo(f"Skipping {len(skipped)} files (already exist with same size)")
+    if skipped_same_file:
+        typer.echo(f"Skipping {len(skipped_same_file)} files (already in correct location)")
+    if skipped_exists:
+        typer.echo(f"Skipping {len(skipped_exists)} files (already exist with same size)")
 
     typer.echo("")
 
