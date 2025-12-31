@@ -9,7 +9,7 @@ See [SPEC.md](SPEC.md) for full details.
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/pokle/video-organise
 cd video-organise
 uv sync
 ```
