@@ -36,3 +36,15 @@ uv run video-organise --approve /Volumes/SDCARD /archive/videos
 ```bash
 uv run pytest
 ```
+
+## Publishing a new version to PyPI
+
+```bash
+uv version --bump patch  # or 'minor' or 'major'
+git tag X.Y.Z         # replace X.Y.Z with the new version
+git push
+```
+
+Then create a [new release with the same version tag on GitHub](https://github.com/pokle/video-organise/releases/new) to trigger the PyPI publish workflow.
+
+
