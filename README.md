@@ -41,8 +41,9 @@ uv run pytest
 
 ```bash
 uv version --bump patch  # or 'minor' or 'major'
+git commit -am "Bump version"
 git tag X.Y.Z         # replace X.Y.Z with the new version
-git push
+git push --tags
 ```
 
 Then create a [new release with the same version tag on GitHub](https://github.com/pokle/video-organise/releases/new) to trigger the PyPI publish workflow.
