@@ -6,6 +6,14 @@ requires-python = ">=3.12"
 dependencies = [
     "typer>=0.21.0",
 ]
+authors = [
+  { name="Tushar Pokle", email="tushar.pokle@gmail.com" },
+]
+readme="README.md
+licence = "MIT"
+[project.urls]
+Homepage = "https://github.com/pokle/video-organise"
+
 
 [project.scripts]
 video-organise = "video_organise:app"

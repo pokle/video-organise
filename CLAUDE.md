@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-See [SPEC.md](SPEC.md) for project behavior and requirements.
+Always read [SPEC.md](SPEC.md) for requirements. Keep it up to date with changes.
 
 ## Tooling
 

@@ -6,10 +6,13 @@ A Python CLI tool that organizes Insta360 files from a source directory into dat
 ## Requirements
 - **File types**: Only Insta360 files (`*.insv`, `*.insp`, `*.lrv`, `fileinfo_list.list`) are organized; all other files are ignored.
 - **Recursion**: Scan source directory recursively for files.
+- **Excluded folders**: Files in `MISC` folders are ignored (these contain Insta360 metadata, not video data).
+- **Duplicate detection**: Errors if the same filename exists in multiple source folders (to prevent data loss).
 - **Date source**: Extract from filename pattern (e.g., `VID_20241011_...`), fall back to filesystem creation date
 - **File action**: Copy files (or move with `--move`), skip if already exists AND same size
 - **Default mode**: Dry-run (preview only)
 - **Output structure**: `{dest}/YYYY-MM-DD/insta360/{original-filename}`
+- **Date folder matching**: Uses existing folder if one starting with `YYYY-MM-DD` exists (e.g., `2024-01-15 Project Name`). Errors if multiple folders match the same date prefix.
 
 ## CLI Interface
 

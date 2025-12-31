@@ -29,6 +29,11 @@ def is_insta360_file(file_path: Path) -> bool:
     return file_path.suffix.lower() in INSTA360_EXTENSIONS or file_path.name in INSTA360_FILENAMES
 
 
+def is_in_excluded_folder(file_path: Path) -> bool:
+    """Check if file is in an excluded folder (e.g., MISC)."""
+    return "MISC" in file_path.parts
+
+
 # Pattern to extract date from Insta360 filenames like:
 # VID_20241011_185020_00_003.insv
 # LRV_20240926_150746_01_003.lrv
@@ -97,6 +102,29 @@ def format_size(size_bytes: int) -> str:
     return f"{size_bytes:.1f} PB"
 
 
+def find_date_folder(dest_dir: Path, date_str: str) -> Path | list[Path]:
+    """Find existing date folder or return default path.
+
+    Looks for folders starting with YYYY-MM-DD (with optional suffix like ' Project Name').
+    Returns:
+    - The matching folder if exactly one exists
+    - The default YYYY-MM-DD path if none exists
+    - A list of matching folders if multiple exist (error case)
+    """
+    matches: list[Path] = []
+    if dest_dir.exists():
+        for folder in dest_dir.iterdir():
+            if folder.is_dir() and folder.name.startswith(date_str):
+                matches.append(folder)
+
+    if len(matches) == 0:
+        return dest_dir / date_str
+    elif len(matches) == 1:
+        return matches[0]
+    else:
+        return matches
+
+
 @app.command()
 def main(
     source_directory: Path = typer.Argument(
@@ -138,34 +166,76 @@ def main(
     By default, runs in dry-run mode showing what would be copied.
     Use --approve to actually copy files.
     """
-    # Collect all Insta360 files recursively
-    files = [f for f in source_directory.rglob("*") if f.is_file() and is_insta360_file(f)]
+    # Collect all Insta360 files recursively (excluding MISC folder)
+    files = [
+        f for f in source_directory.rglob("*")
+        if f.is_file() and is_insta360_file(f) and not is_in_excluded_folder(f)
+    ]
 
     if not files:
         typer.echo("No Insta360 files found in source directory.")
         raise typer.Exit()
 
-    to_copy: list[tuple[Path, Path]] = []
+    # Check for duplicate filenames
+    filenames: dict[str, list[Path]] = {}
+    for f in files:
+        filenames.setdefault(f.name, []).append(f)
+
+    duplicates = {name: paths for name, paths in filenames.items() if len(paths) > 1}
+    if duplicates:
+        typer.echo("Error: Duplicate filenames found:", err=True)
+        for name, paths in sorted(duplicates.items()):
+            typer.echo(f"  {name}:", err=True)
+            for p in paths:
+                typer.echo(f"    - {p}", err=True)
+        raise typer.Exit(1)
+
+    # reason is: "new" (dest missing) or "size_mismatch" (with src_size, dest_size)
+    to_copy: list[tuple[Path, Path, str]] = []
     skipped_same_file: list[Path] = []
     skipped_exists: list[Path] = []
     total_size = 0
 
+    # Track dates with multiple matching folders (error case)
+    ambiguous_dates: dict[str, list[Path]] = {}
+
     for src_file in files:
         file_date = get_file_date(src_file)
-        date_folder = file_date.strftime("%Y-%m-%d")
-        dest_path = destination_directory / date_folder / "insta360" / src_file.name
+        date_str = file_date.strftime("%Y-%m-%d")
+        date_folder_result = find_date_folder(destination_directory, date_str)
+
+        # Check for ambiguous date folders
+        if isinstance(date_folder_result, list):
+            if date_str not in ambiguous_dates:
+                ambiguous_dates[date_str] = date_folder_result
+            continue
+
+        date_folder = date_folder_result
+        dest_path = date_folder / "insta360" / src_file.name
 
         # Check if source and destination are the same file
         if src_file.resolve() == dest_path.resolve():
             skipped_same_file.append(src_file)
         elif not dest_path.exists():
-            to_copy.append((src_file, dest_path))
+            to_copy.append((src_file, dest_path, "new"))
             total_size += src_file.stat().st_size
         elif src_file.stat().st_size != dest_path.stat().st_size:
-            to_copy.append((src_file, dest_path))
-            total_size += src_file.stat().st_size
+            src_size = src_file.stat().st_size
+            dest_size = dest_path.stat().st_size
+            reason = f"size_mismatch:{src_size}:{dest_size}"
+            to_copy.append((src_file, dest_path, reason))
+            total_size += src_size
         else:
             skipped_exists.append(src_file)
+
+    # Error if any dates have multiple matching destination folders
+    if ambiguous_dates:
+        typer.echo("Error: Multiple destination folders found for same date:", err=True)
+        for date_str, folders in sorted(ambiguous_dates.items()):
+            typer.echo(f"  {date_str}:", err=True)
+            for folder in sorted(folders):
+                typer.echo(f"    - {folder.name}", err=True)
+        raise typer.Exit(1)
 
     # Print summary
     action = "Moving" if move else "Copying"
@@ -182,7 +252,7 @@ def main(
     typer.echo("")
 
     # Process files
-    for src_file, dest_path in to_copy:
+    for src_file, dest_path, reason in to_copy:
         if approve:
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             if move:
@@ -192,7 +262,14 @@ def main(
                 shutil.copy2(src_file, dest_path)
                 typer.echo(f"Copied: {src_file} -> {dest_path}")
         else:
-            typer.echo(f"Would {'move' if move else 'copy'}: {src_file} -> {dest_path}")
+            # Explain why the file would be copied
+            if reason == "new":
+                reason_text = "(dest missing)"
+            else:
+                # reason is "size_mismatch:src_size:dest_size"
+                _, src_size, dest_size = reason.split(":")
+                reason_text = f"(size mismatch: src {format_size(int(src_size))} vs dest {format_size(int(dest_size))})"
+            typer.echo(f"Would {'move' if move else 'copy'}: {src_file} -> {dest_path} {reason_text}")
 
     if not approve and to_copy:
         typer.echo("")

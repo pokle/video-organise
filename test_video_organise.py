@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from video_organise import app, get_file_date, get_date_from_filename, should_copy, format_size, is_insta360_file
+from video_organise import app, get_file_date, get_date_from_filename, should_copy, format_size, is_insta360_file, is_in_excluded_folder, find_date_folder
 
 runner = CliRunner()
 
@@ -454,3 +454,228 @@ class TestCLI:
         result = runner.invoke(app, [str(src_dir), "/nonexistent/path"])
 
         assert result.exit_code != 0
+
+    def test_excludes_misc_folder(self, tmp_path: Path) -> None:
+        """Should ignore files in MISC folder."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        misc_dir = src_dir / "MISC"
+        misc_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        # Create file in MISC (should be ignored)
+        (misc_dir / "video.insv").write_text("misc data")
+        # Create file outside MISC (should be processed)
+        (src_dir / "real_video.insv").write_text("real video")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 0
+        assert "Would copy 1 files" in result.output
+        assert "real_video.insv" in result.output
+        assert "MISC" not in result.output
+
+    def test_excludes_nested_misc_folder(self, tmp_path: Path) -> None:
+        """Should ignore files in nested MISC folder."""
+        src_dir = tmp_path / "src"
+        dcim = src_dir / "DCIM"
+        misc_dir = dcim / "MISC"
+        misc_dir.mkdir(parents=True)
+        camera_dir = dcim / "Camera01"
+        camera_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        # Create file in nested MISC (should be ignored)
+        (misc_dir / "VID_20241226_160400_00_029.insv").write_text("misc data")
+        # Create file in Camera01 (should be processed)
+        (camera_dir / "VID_20241226_160400_00_029.insv").write_text("real video")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 0
+        assert "Would copy 1 files" in result.output
+        assert "Camera01" in result.output
+
+    def test_duplicate_filenames_error(self, tmp_path: Path) -> None:
+        """Should error when same filename exists in different folders."""
+        src_dir = tmp_path / "src"
+        folder1 = src_dir / "Camera01"
+        folder2 = src_dir / "Camera02"
+        folder1.mkdir(parents=True)
+        folder2.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        # Create same filename in different folders
+        (folder1 / "video.insv").write_text("content1")
+        (folder2 / "video.insv").write_text("content2")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 1
+        assert "Duplicate filenames found" in result.output
+        assert "video.insv" in result.output
+
+    def test_same_filename_different_extensions_ok(self, tmp_path: Path) -> None:
+        """Should allow same base name with different extensions."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        # Same base name, different extensions - should be fine
+        (src_dir / "video.insv").write_text("video")
+        (src_dir / "video.lrv").write_text("low-res")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 0
+        assert "Would copy 2 files" in result.output
+
+
+class TestIsInExcludedFolder:
+    """Tests for is_in_excluded_folder function."""
+
+    def test_misc_folder(self, tmp_path: Path) -> None:
+        """Should return True for files in MISC folder."""
+        file_path = tmp_path / "MISC" / "video.insv"
+        assert is_in_excluded_folder(file_path) is True
+
+    def test_nested_misc_folder(self, tmp_path: Path) -> None:
+        """Should return True for files in nested MISC folder."""
+        file_path = tmp_path / "DCIM" / "MISC" / "video.insv"
+        assert is_in_excluded_folder(file_path) is True
+
+    def test_camera_folder(self, tmp_path: Path) -> None:
+        """Should return False for files in Camera folder."""
+        file_path = tmp_path / "DCIM" / "Camera01" / "video.insv"
+        assert is_in_excluded_folder(file_path) is False
+
+    def test_root_folder(self, tmp_path: Path) -> None:
+        """Should return False for files in root."""
+        file_path = tmp_path / "video.insv"
+        assert is_in_excluded_folder(file_path) is False
+
+
+class TestFindDateFolder:
+    """Tests for find_date_folder function."""
+
+    def test_returns_existing_folder_with_suffix(self, tmp_path: Path) -> None:
+        """Should find existing folder with project name suffix."""
+        existing = tmp_path / "2024-01-15 Project Name"
+        existing.mkdir()
+
+        result = find_date_folder(tmp_path, "2024-01-15")
+        assert result == existing
+
+    def test_returns_existing_folder_exact_match(self, tmp_path: Path) -> None:
+        """Should find existing folder with exact date match."""
+        existing = tmp_path / "2024-01-15"
+        existing.mkdir()
+
+        result = find_date_folder(tmp_path, "2024-01-15")
+        assert result == existing
+
+    def test_returns_default_when_no_match(self, tmp_path: Path) -> None:
+        """Should return default path when no matching folder exists."""
+        result = find_date_folder(tmp_path, "2024-01-15")
+        assert result == tmp_path / "2024-01-15"
+
+    def test_returns_default_when_dest_empty(self, tmp_path: Path) -> None:
+        """Should return default path when destination is empty."""
+        result = find_date_folder(tmp_path, "2024-01-15")
+        assert result == tmp_path / "2024-01-15"
+
+    def test_ignores_files_with_date_prefix(self, tmp_path: Path) -> None:
+        """Should ignore files, only match directories."""
+        (tmp_path / "2024-01-15-file.txt").write_text("not a folder")
+
+        result = find_date_folder(tmp_path, "2024-01-15")
+        assert result == tmp_path / "2024-01-15"
+
+    def test_returns_list_when_multiple_matches(self, tmp_path: Path) -> None:
+        """Should return list when multiple folders match same date."""
+        folder1 = tmp_path / "2024-01-15 Project A"
+        folder2 = tmp_path / "2024-01-15 Project B"
+        folder1.mkdir()
+        folder2.mkdir()
+
+        result = find_date_folder(tmp_path, "2024-01-15")
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert folder1 in result
+        assert folder2 in result
+
+
+class TestCLIDateFolderMatching:
+    """Tests for CLI date folder matching behavior."""
+
+    def test_uses_existing_folder_with_suffix(self, tmp_path: Path) -> None:
+        """Should use existing date folder with suffix instead of creating new one."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        # Create existing folder with suffix
+        existing_folder = dest_dir / "2023-03-03 Moggs Sting"
+        insta360_folder = existing_folder / "insta360"
+        insta360_folder.mkdir(parents=True)
+
+        # Create source file with date in filename
+        test_file = src_dir / "VID_20230303_193624_00_001.insv"
+        test_file.write_text("video content")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 0
+        # Should target the existing folder with suffix
+        assert "2023-03-03 Moggs Sting" in result.output
+        assert "2023-03-03/insta360" not in result.output
+
+    def test_skips_existing_file_in_renamed_folder(self, tmp_path: Path) -> None:
+        """Should recognize file exists in renamed folder."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        # Create existing folder with suffix and file
+        existing_folder = dest_dir / "2023-03-03 Moggs Sting"
+        insta360_folder = existing_folder / "insta360"
+        insta360_folder.mkdir(parents=True)
+        (insta360_folder / "VID_20230303_193624_00_001.insv").write_text("video content")
+
+        # Create source file with same content
+        test_file = src_dir / "VID_20230303_193624_00_001.insv"
+        test_file.write_text("video content")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 0
+        assert "Skipping 1 files (already exist with same size)" in result.output
+
+    def test_errors_on_multiple_date_folders(self, tmp_path: Path) -> None:
+        """Should error when multiple folders match same date prefix."""
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dest_dir = tmp_path / "dest"
+        dest_dir.mkdir()
+
+        # Create multiple folders with same date prefix
+        (dest_dir / "2023-03-03 Project A").mkdir()
+        (dest_dir / "2023-03-03 Project B").mkdir()
+
+        # Create source file with that date
+        test_file = src_dir / "VID_20230303_193624_00_001.insv"
+        test_file.write_text("video content")
+
+        result = runner.invoke(app, [str(src_dir), str(dest_dir)])
+
+        assert result.exit_code == 1
+        assert "Multiple destination folders found for same date" in result.output
+        assert "2023-03-03" in result.output
+        assert "Project A" in result.output
+        assert "Project B" in result.output
